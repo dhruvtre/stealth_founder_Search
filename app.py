@@ -79,7 +79,6 @@ st.markdown("""
             position: fixed;
             top: 0;
             height: 100vh;
-            background-color: #f8f9fa;
         }
     </style>
 """, unsafe_allow_html=True)
