@@ -99,11 +99,8 @@ st.title("Stealth Founder Search & Tracking")
 # Sidebar or main input for selecting companies
 st.subheader("Select a past company from the list")
 
-# Dropdown or selection box for companies
-past_company = st.selectbox("Select a stealth company:", [comp["name"] for comp in list_of_unicorns])
-
-# Show selected company URL
-past_company_url = next((comp["url"] for comp in list_of_unicorns if comp["name"] == past_company), None)
+# Multiselect option for choosing past companies.
+past_company_name = st.multiselect("Choose past companies to get started", [comp["company_name"] for comp in list_of_unicorns], default=None, help="You can pick up to three companies at once to get started.", max_selections=3, placeholder="Choose upto three companies to get started.", label_visibility="visible")
 
 # Get the past company URL (example: Freshworks)
 selected_company_urls = stealth_company_urls_list
@@ -112,24 +109,29 @@ total_linkedin_profiles_found = 0
 
 # Button to trigger search
 if st.button("Search"):
-    logging.info(f"Initiating search for employees from {past_company} currently building in stealth.")
-    st.write(f"Searching for employees from {past_company} currently building in stealth.")
+    # Create a dictionary for easier lookup
+    company_url_lookup = {comp["company_name"]: comp["company_linkedin_url"] for comp in list_of_unicorns}
+
     with st.spinner("Searching for profiles..."):
-        if past_company_url:
-            for url in selected_company_urls:
-                logging.info(f"Searching stealth employees from {past_company} to {url}")
-                search_results = proxy_employee_search(proxycurl_api_key, url, past_company_url)
-                if 'error' not in search_results:
-                    logging.info(f"Found {search_results['total_results']} profiles at {url}.")
-                    total_linkedin_profiles_found = total_linkedin_profiles_found + search_results['total_results']
-                    for item in search_results['profiles']:
-                        linkedin_profile_list.append(item)
-                else:
-                    st.error(f"Error: {search_results['error']}")
-                    logging.error(f"Error while searching {url}: {search_results['error']}")
+        for company_name in past_company_name:
+            company_url = company_url_lookup[company_name] 
+            logging.info(f"Initiating search for employees from {company_name} currently building in stealth.")
+            st.write(f"Searching for employees from {company_name} currently building in stealth.")
+            if company_url:
+                for url in selected_company_urls:
+                    logging.info(f"Searching stealth employees from {company_url} to {url}")
+                    search_results = proxy_employee_search(proxycurl_api_key, url, company_url)
+                    if 'error' not in search_results:
+                        logging.info(f"Found {search_results['total_results']} profiles at {url}.")
+                        total_linkedin_profiles_found = total_linkedin_profiles_found + search_results['total_results']
+                        for item in search_results['profiles']:
+                            linkedin_profile_list.append(item)
+                    else:
+                        st.error(f"Error: {search_results['error']}")
+                        logging.error(f"Error while searching {url}: {search_results['error']}")
         
-            st.write(f"Found {total_linkedin_profiles_found} profiles.")
-            logging.info(f"Search completed. Total profiles found: {total_linkedin_profiles_found}")
+        st.write(f"Found {total_linkedin_profiles_found} profiles.")
+        logging.info(f"Search completed. Total profiles found: {total_linkedin_profiles_found}")
             
     with st.spinner("Scraping individual profiles."):
         complete_profiles = []
@@ -158,7 +160,7 @@ if st.button("Search"):
         st.download_button(
                 label="Download Profiles as CSV",
                 data=csv,
-                file_name=f"{past_company}_stealth_founders_profiles.csv",
+                file_name=f"stealth_founders_profiles.csv",
                 mime="text/csv",
             )
     else:
