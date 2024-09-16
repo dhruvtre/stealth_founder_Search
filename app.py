@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from src.main_functions import proxy_employee_search, linkedin_profile_scraper, store_profiles_to_csv, stealth_company_urls_list
+from src.main_functions import *
 from src.top_unicorn_list import list_of_unicorns
 
 import logging
@@ -84,25 +84,25 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 with st.sidebar:
-    st.image("assets/Group 5-2.png", width=150)  # Adjust the width as necessary
+    st.image("assets/Group 5-2.png", width=150) 
 
-    # Add a short description under the logo
+    
     st.markdown("""
-        ### Stealth Founder Search & Tracking
-        Use this tool to find and track stealth founders. Enter a company name and search for founders who have moved into stealth mode.
+        ## 🚀 Dealey Founder Database
+        Extract valuable signals and find the "needles in the haystack." 
+        
+        Start your search for stealth founders from our list of 120 Indian Unicorns. More signals being added soon! 🔍
     """)
 
 # Streamlit app title
-st.title("Stealth Founder Search & Tracking")
+st.title("🚨 Discover & Track Stealth Founders")
 
-# Sidebar or main input for selecting companies
-st.subheader("Select a past company from the list")
+st.markdown("""#### Select upto 3 unicorns from the list. Dealey will find founders building in stealth from those companies.""")
 
 # Multiselect option for choosing past companies.
 past_company_name = st.multiselect("Choose past companies to get started", [comp["company_name"] for comp in list_of_unicorns], default=None, help="You can pick up to three companies at once to get started.", max_selections=3, placeholder="Choose upto three companies to get started.", label_visibility="visible")
 
 # Get the past company URL (example: Freshworks)
-selected_company_urls = stealth_company_urls_list
 linkedin_profile_list = []
 total_linkedin_profiles_found = 0
 
@@ -117,31 +117,22 @@ if st.button("Search"):
             logging.info(f"Initiating search for employees from {company_name} currently building in stealth.")
             st.write(f"Searching for employees from {company_name} currently building in stealth.")
             if company_url:
-                for url in selected_company_urls:
-                    logging.info(f"Searching stealth employees from {company_url} to {url}")
-                    search_results = proxy_employee_search(proxycurl_api_key, url, company_url)
-                    if 'error' not in search_results:
-                        logging.info(f"Found {search_results['total_results']} profiles at {url}.")
-                        total_linkedin_profiles_found = total_linkedin_profiles_found + search_results['total_results']
-                        for item in search_results['profiles']:
-                            linkedin_profile_list.append(item)
-                    else:
-                        st.error(f"Error: {search_results['error']}")
-                        logging.error(f"Error while searching {url}: {search_results['error']}")
-        
-        st.write(f"Found {total_linkedin_profiles_found} profiles.")
-        logging.info(f"Search completed. Total profiles found: {total_linkedin_profiles_found}")
+                logging.info(f"Searching stealth employees from {company_url} across all stealth companies.")
+                search_results = run_search_all_companies_sync(proxycurl_api_key, company_url)
+
+                if search_results:
+                    linkedin_profile_list.extend(search_results)
+                    total_linkedin_profiles_found = len(search_results)
+                    logging.info(f"Found {total_linkedin_profiles_found} profiles.")
+                else:
+                    st.error("No profiles found or an error occurred.")
+    
+    linkedin_profile_list = list(set(linkedin_profile_list))
+    st.write(f"Found {len(linkedin_profile_list)} profiles.")
+    logging.info(f"Search completed. Total profiles found: {len(linkedin_profile_list)}")
             
     with st.spinner("Scraping individual profiles."):
-        complete_profiles = []
-        for item in linkedin_profile_list:
-            logging.info(f"Scraping profile: {item}")
-            profile = linkedin_profile_scraper(rapidapi_api_key, item)
-            if 'error' not in profile:
-                complete_profiles.append(profile)
-                logging.info(f"Successfully scraped profile: {item}")
-            else:
-                logging.error(f"Failed to scrape profile: {item}. Error: {profile['error']}")
+        complete_profiles = run_scrape_multiple_profiles_sync(rapidapi_api_key, linkedin_profile_list)
         
     # Display the profiles
     if complete_profiles:
