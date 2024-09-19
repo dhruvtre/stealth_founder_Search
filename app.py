@@ -2,10 +2,6 @@ import streamlit as st
 import pandas as pd
 from src.main_functions import *
 from src.top_unicorn_list import list_of_unicorns
-from src.main_functions import (
-    send_log_via_email_async,
-    log_stream
-)
 
 import logging
 start_time = time.time()
