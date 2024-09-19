@@ -2,11 +2,18 @@ import streamlit as st
 import pandas as pd
 from src.main_functions import *
 from src.top_unicorn_list import list_of_unicorns
+from src.main_functions import (
+    send_log_via_email_async,
+    log_stream
+)
 
 import logging
+start_time = time.time()
+if 'logs_sent' not in st.session_state:
+    st.session_state.logs_sent = False
 
 # Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+# logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 proxycurl_api_key = st.secrets["proxycurl_api_key"]
 rapidapi_api_key = st.secrets["rapidapi_api_key"]
@@ -101,6 +108,7 @@ st.markdown("""#### Select upto 3 unicorns from the list. Dealey will find found
 
 # Multiselect option for choosing past companies.
 past_company_name = st.multiselect("Choose past companies to get started", [comp["company_name"] for comp in list_of_unicorns], default=None, help="You can pick up to three companies at once to get started.", max_selections=3, placeholder="Choose upto three companies to get started.", label_visibility="visible")
+logging.info(f"User selected {len(past_company_name)} companies for search: {past_company_name}")
 
 # Get the past company URL (example: Freshworks)
 linkedin_profile_list = []
@@ -108,6 +116,7 @@ total_linkedin_profiles_found = 0
 
 # Button to trigger search
 if st.button("Search"):
+    logging.info("Search button pressed by user.")
     # Create a dictionary for easier lookup
     company_url_lookup = {comp["company_name"]: comp["company_linkedin_url"] for comp in list_of_unicorns}
 
@@ -126,7 +135,7 @@ if st.button("Search"):
                     logging.info(f"Found {total_linkedin_profiles_found} profiles.")
                 else:
                     st.error("No profiles found or an error occurred.")
-    
+    logging.info(f"Search process completed in {time.time() - start_time} seconds.")
     linkedin_profile_list = list(set(linkedin_profile_list))
     st.write(f"Found {len(linkedin_profile_list)} profiles.")
     logging.info(f"Search completed. Total profiles found: {len(linkedin_profile_list)}")
@@ -136,8 +145,10 @@ if st.button("Search"):
         
     # Display the profiles
     if complete_profiles:
+        logging.info(f"Profile Scraping process completed in {time.time() - start_time} seconds.")
         for profile in complete_profiles:
             display_profile_card(profile)
+        logging.info(f"Displaying {len(complete_profiles)} profiles to user.")
 
         # Allow users to save profiles as CSV
     
@@ -153,6 +164,22 @@ if st.button("Search"):
                 file_name=f"stealth_founders_profiles.csv",
                 mime="text/csv",
             )
+        
+        if not st.session_state.logs_sent:
+            log_contents = log_stream.getvalue()
+            if log_contents:
+                send_log_via_email_async(
+                    sender_email=st.secrets["sender_email"],
+                    sender_password=st.secrets["sender_password"],
+                    receiver_email=st.secrets["receiver_email"],
+                    log_content=log_contents
+                )
+                logging.info("Logs sent after scraping.")
+                st.session_state.logs_sent = True
+                log_stream.truncate(0)
+                log_stream.seek(0)
+            else:
+                logging.warning("No logs captured to send via email.")
     else:
         st.warning("No profiles found for the selected company.")
 else:

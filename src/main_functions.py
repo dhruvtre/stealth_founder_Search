@@ -1,16 +1,45 @@
+#List of original imports
 import requests
 import asyncio
 import aiohttp
 import streamlit as st
 
+#List of logging specific and email specific imports
 import logging
+import io
+from logging import StreamHandler
+import smtplib
+from email.message import EmailMessage
+import sys
+import threading
+import time
+
+
 
 # Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+# logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
+# Create an in-memory log stream
+log_stream = io.StringIO()
 
-import aiohttp
-import logging
+# Set up the in-memory handler
+memory_handler = StreamHandler(log_stream)
+formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+memory_handler.setFormatter(formatter)
+
+# Configure the root logger
+logger = logging.getLogger()
+
+if not logger.hasHandlers():
+    logger.setLevel(logging.INFO)
+    logger.addHandler(memory_handler)
+
+    # Create a console handler
+    console_handler = StreamHandler(sys.stdout)
+    console_handler.setFormatter(formatter)
+
+    # Add the console handler to the logger
+    logger.addHandler(console_handler)
 
 async def proxy_employee_search_async(proxy_api_key, current_company_profile_url, past_company_profile_url):
     headers = {'Authorization': 'Bearer ' + proxy_api_key}
@@ -56,6 +85,7 @@ async def search_all_stealth_companies(proxy_api_key, past_company_profile_url):
 
     # Run all tasks concurrently
     results = await asyncio.gather(*tasks)
+    logging.info(f"All async tasks completed for searching stealth companies.")
 
     # You can now process the results from all the concurrent API calls
     all_profiles = []
@@ -220,3 +250,41 @@ def store_profiles_to_csv(profiles, filename=None):
 # Example Usage:
 # profiles = [linkedin_profile_scraper(api_key, url1), linkedin_profile_scraper(api_key, url2), ...]
 # store_profiles_to_csv(profiles)
+
+#function to record log contents and email it to admin
+
+def send_log_via_email(sender_email, sender_password, receiver_email, log_content):
+    """
+    Sends the log content via email as a text attachment.
+    """
+    
+    msg = EmailMessage()
+    msg['Subject'] = 'Application Logs'
+    msg['From'] = sender_email
+    msg['To'] = receiver_email
+    msg.set_content('Please find the attached logs from the latest run of the application.')
+
+    # Attach the log content as a text file if the log_content file is not empty
+    if log_content:
+        msg.add_attachment(log_content, subtype='plain', filename='app_logs.txt', charset='utf-8')
+    else:
+        logging.warning("No log content to attach.")
+
+    # Send the email
+    try:
+        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
+            smtp.login(sender_email, sender_password)
+            smtp.send_message(msg)
+        logging.info("Logs sent successfully via email.")
+    except smtplib.SMTPAuthenticationError:
+        logging.error("Authentication failed. Check your email credentials.")
+    except smtplib.SMTPException as e:
+        logging.error(f"SMTP error occurred: {e}")
+    except Exception as e:
+        logging.error(f"An unexpected error occurred: {e}")
+
+def send_log_via_email_async(sender_email, sender_password, receiver_email, log_content):
+    """
+    Sends the log content via email asynchronously.
+    """
+    threading.Thread(target=send_log_via_email, args=(sender_email, sender_password, receiver_email, log_content)).start()
