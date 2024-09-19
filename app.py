@@ -5,8 +5,6 @@ from src.top_unicorn_list import list_of_unicorns
 
 import logging
 start_time = time.time()
-if 'logs_sent' not in st.session_state:
-    st.session_state.logs_sent = False
 
 # Configure logging
 # logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -161,9 +159,8 @@ if st.button("Search"):
                 mime="text/csv",
             )
         
-        if not st.session_state.logs_sent:
-            log_contents = log_stream.getvalue()
-            if log_contents:
+        log_contents = log_stream.getvalue()
+        if log_contents:
                 send_log_via_email_async(
                     sender_email=st.secrets["sender_email"],
                     sender_password=st.secrets["sender_password"],
@@ -171,11 +168,10 @@ if st.button("Search"):
                     log_content=log_contents
                 )
                 logging.info("Logs sent after scraping.")
-                st.session_state.logs_sent = True
                 log_stream.truncate(0)
                 log_stream.seek(0)
-            else:
-                logging.warning("No logs captured to send via email.")
+        else:
+            logging.warning("No logs captured to send via email.")
     else:
         st.warning("No profiles found for the selected company.")
 else:
