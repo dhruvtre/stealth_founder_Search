@@ -2,20 +2,54 @@ import streamlit as st
 import pandas as pd
 from src.main_functions import *
 from src.top_unicorn_list import list_of_unicorns
-
 import logging
-start_time = time.time()
+import sys
+import io
+from logging import StreamHandler
+import time
 
-# Configure logging
-# logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+# Set up logging if not already configured
+if 'log_initialized' not in st.session_state:
+    st.session_state['log_stream'] = io.StringIO()
+    log_stream = st.session_state['log_stream']
+
+    # Set up the in-memory handler
+    memory_handler = logging.StreamHandler(log_stream)
+    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+    memory_handler.setFormatter(formatter)
+
+    # Configure the root logger
+    logger = logging.getLogger()
+    logger.setLevel(logging.INFO)
+    logger.addHandler(memory_handler)
+
+    # Create a console handler for real-time logs
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setFormatter(formatter)
+    logger.addHandler(console_handler)
+
+    logger.info("Logger initialized")
+
+    # Mark logging as initialized
+    st.session_state['log_initialized'] = True
+
+else:
+    # Retrieve the existing log_stream
+    log_stream = st.session_state['log_stream']
+    logger = logging.getLogger()
+
 
 proxycurl_api_key = st.secrets["proxycurl_api_key"]
 rapidapi_api_key = st.secrets["rapidapi_api_key"]
+supabase_url = st.secrets["supabase_url"]
+supabase_key = st.secrets["supabase_key"]
 
 # Function to cache CSV conversion
 @st.cache_data
 def convert_df_to_csv(df):
     return df.to_csv().encode('utf-8')
+
+supabase_client = create_supabase_client(supabase_url, supabase_key)
 
 def display_profile_card(profile):
     with st.container(border=True):
@@ -110,43 +144,33 @@ total_linkedin_profiles_found = 0
 
 # Button to trigger search
 if st.button("Search"):
+    start_time = time.time()
     logging.info("Search button pressed by user.")
-    # Create a dictionary for easier lookup
-    company_url_lookup = {comp["company_name"]: comp["company_linkedin_url"] for comp in list_of_unicorns}
 
     with st.spinner("Searching for profiles..."):
-        for company_name in past_company_name:
-            company_url = company_url_lookup[company_name] 
-            logging.info(f"Initiating search for employees from {company_name} currently building in stealth.")
-            st.write(f"Searching for employees from {company_name} currently building in stealth.")
-            if company_url:
-                logging.info(f"Searching stealth employees from {company_url} across all stealth companies.")
-                search_results = run_search_all_companies_sync(proxycurl_api_key, company_url)
-
-                if search_results:
-                    linkedin_profile_list.extend(search_results)
-                    total_linkedin_profiles_found = len(search_results)
-                    logging.info(f"Found {total_linkedin_profiles_found} profiles.")
-                else:
-                    st.error("No profiles found or an error occurred.")
-    logging.info(f"Search process completed in {time.time() - start_time} seconds.")
-    linkedin_profile_list = list(set(linkedin_profile_list))
-    st.write(f"Found {len(linkedin_profile_list)} profiles.")
-    logging.info(f"Search completed. Total profiles found: {len(linkedin_profile_list)}")
-            
-    with st.spinner("Scraping individual profiles."):
-        complete_profiles = run_scrape_multiple_profiles_sync(rapidapi_api_key, linkedin_profile_list)
+        # Create a dictionary for easier lookup
+        company_url_lookup = {comp["company_name"]: comp["company_linkedin_url"] for comp in list_of_unicorns}
         
-    # Display the profiles
-    if complete_profiles:
-        logging.info(f"Profile Scraping process completed in {time.time() - start_time} seconds.")
-        for profile in complete_profiles:
+        for company_name in past_company_name:
+            company_url = company_url_lookup[company_name]
+            list_of_profiles_retrieved = query_stealth_founder_table(supabase_client, company_name)
+            if len(list_of_profiles_retrieved):
+                linkedin_profile_list.extend(list_of_profiles_retrieved)
+                time.sleep(0.7)
+                st.success(f"Profiles found for company {company_name}")
+            else:
+                time.sleep(0.7)
+                st.error(f"No profiles found or an error occurred for company {company_name}.")
+        logging.info(f"Search process completed in {time.time() - start_time} seconds.")
+        st.write(f"Found {len(linkedin_profile_list)} profiles.")
+        logging.info(f"Search completed. Total profiles found: {len(linkedin_profile_list)}")
+    if len(linkedin_profile_list):
+        for profile in linkedin_profile_list:
             display_profile_card(profile)
-        logging.info(f"Displaying {len(complete_profiles)} profiles to user.")
-
-        # Allow users to save profiles as CSV
     
-        df = pd.DataFrame(complete_profiles)
+        logging.info(f"Displaying {len(linkedin_profile_list)} profiles to user.")
+        # Allow users to save profiles as CSV
+        df = pd.DataFrame(linkedin_profile_list)
 
         # Convert DataFrame to CSV using cached function
         csv = convert_df_to_csv(df)
@@ -158,21 +182,18 @@ if st.button("Search"):
                 file_name=f"stealth_founders_profiles.csv",
                 mime="text/csv",
             )
-        
-        log_contents = log_stream.getvalue()
-        if log_contents:
-                send_log_via_email_async(
+    log_contents = st.session_state['log_stream'].getvalue()
+    if log_contents:
+            send_log_via_email_async(
                     sender_email=st.secrets["sender_email"],
                     sender_password=st.secrets["sender_password"],
                     receiver_email=st.secrets["receiver_email"],
                     log_content=log_contents
                 )
-                logging.info("Logs sent after scraping.")
-                log_stream.truncate(0)
-                log_stream.seek(0)
-        else:
-            logging.warning("No logs captured to send via email.")
+            logging.info("Logs sent after scraping.")
+            st.session_state['log_stream'].truncate(0)
+            st.session_state['log_stream'].seek(0)
     else:
-        st.warning("No profiles found for the selected company.")
+            logging.warning("No logs captured to send via email.")  
 else:
-    st.error("Please select a valid company.")
+    st.info("Get started by selecting up to three companies.")

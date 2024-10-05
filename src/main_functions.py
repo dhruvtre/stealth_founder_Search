@@ -6,40 +6,9 @@ import streamlit as st
 
 #List of logging specific and email specific imports
 import logging
-import io
-from logging import StreamHandler
 import smtplib
 from email.message import EmailMessage
-import sys
 import threading
-import time
-
-
-
-# Configure logging
-# logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-
-# Create an in-memory log stream
-log_stream = io.StringIO()
-
-# Set up the in-memory handler
-memory_handler = StreamHandler(log_stream)
-formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-memory_handler.setFormatter(formatter)
-
-# Configure the root logger
-logger = logging.getLogger()
-
-if not logger.hasHandlers():
-    logger.setLevel(logging.INFO)
-    logger.addHandler(memory_handler)
-
-    # Create a console handler
-    console_handler = StreamHandler(sys.stdout)
-    console_handler.setFormatter(formatter)
-
-    # Add the console handler to the logger
-    logger.addHandler(console_handler)
 
 async def proxy_employee_search_async(proxy_api_key, current_company_profile_url, past_company_profile_url):
     headers = {'Authorization': 'Bearer ' + proxy_api_key}
@@ -288,3 +257,28 @@ def send_log_via_email_async(sender_email, sender_password, receiver_email, log_
     Sends the log content via email asynchronously.
     """
     threading.Thread(target=send_log_via_email, args=(sender_email, sender_password, receiver_email, log_content)).start()
+
+from supabase import create_client, Client
+
+# Initialize Supabase client
+def create_supabase_client(supabase_url, supabase_key):
+    supabase: Client = create_client(supabase_url, supabase_key)
+    return supabase
+
+def query_stealth_founder_table(supabase, past_company):
+    try:
+        response = supabase.table("Unicorn-Stealth-Founder-Profiles").select("*").eq("search_company", past_company).execute()
+
+        # Check if the response contains data
+        if response:
+            logging.info(f"Successfully retrieved profiles for {past_company}.")
+            list_of_profiles = response.data
+            logging.info(f"Found {len(list_of_profiles)} for {past_company}.")
+            return list_of_profiles
+        else:
+            logging.warning(f"No profiles found for {past_company}.")
+            return []
+
+    except Exception as e: 
+        logging.error(f"Error querying profiles for {past_company}: {str(e)}")
+        return []
