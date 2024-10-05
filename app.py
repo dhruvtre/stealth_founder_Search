@@ -10,17 +10,19 @@ import time
 
 # Set up logging if not already configured
 if 'log_initialized' not in st.session_state:
+    # Create StringIO for capturing logs
     st.session_state['log_stream'] = io.StringIO()
     log_stream = st.session_state['log_stream']
+
+    # Create a custom logger
+    logger = logging.getLogger('my_logger')
+    logger.setLevel(logging.INFO)
+    logger.propagate = False  # Prevent messages from propagating to the root logger
 
     # Set up the in-memory handler
     memory_handler = logging.StreamHandler(log_stream)
     formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
     memory_handler.setFormatter(formatter)
-
-    # Configure the root logger
-    logger = logging.getLogger()
-    logger.setLevel(logging.INFO)
     logger.addHandler(memory_handler)
 
     # Create a console handler for real-time logs
@@ -31,12 +33,13 @@ if 'log_initialized' not in st.session_state:
     logger.info("Logger initialized")
 
     # Mark logging as initialized
+    st.session_state['logger'] = logger
     st.session_state['log_initialized'] = True
 
 else:
-    # Retrieve the existing log_stream
+    # Retrieve the existing logger and log_stream
+    logger = st.session_state['logger']
     log_stream = st.session_state['log_stream']
-    logger = logging.getLogger()
 
 
 proxycurl_api_key = st.secrets["proxycurl_api_key"]
@@ -136,7 +139,7 @@ st.markdown("""#### Select upto 3 unicorns from the list. Dealey will find found
 
 # Multiselect option for choosing past companies.
 past_company_name = st.multiselect("Choose past companies to get started", [comp["company_name"] for comp in list_of_unicorns], default=None, help="You can pick up to three companies at once to get started.", max_selections=3, placeholder="Choose upto three companies to get started.", label_visibility="visible")
-logging.info(f"User selected {len(past_company_name)} companies for search: {past_company_name}")
+logger.info(f"User selected {len(past_company_name)} companies for search: {past_company_name}")
 
 # Get the past company URL (example: Freshworks)
 linkedin_profile_list = []
@@ -145,7 +148,7 @@ total_linkedin_profiles_found = 0
 # Button to trigger search
 if st.button("Search"):
     start_time = time.time()
-    logging.info("Search button pressed by user.")
+    logger.info("Search button pressed by user.")
 
     with st.spinner("Searching for profiles..."):
         # Create a dictionary for easier lookup
@@ -161,14 +164,14 @@ if st.button("Search"):
             else:
                 time.sleep(0.7)
                 st.error(f"No profiles found or an error occurred for company {company_name}.")
-        logging.info(f"Search process completed in {time.time() - start_time} seconds.")
+        logger.info(f"Search process completed in {time.time() - start_time} seconds.")
         st.write(f"Found {len(linkedin_profile_list)} profiles.")
-        logging.info(f"Search completed. Total profiles found: {len(linkedin_profile_list)}")
+        logger.info(f"Search completed. Total profiles found: {len(linkedin_profile_list)}")
     if len(linkedin_profile_list):
         for profile in linkedin_profile_list:
             display_profile_card(profile)
     
-        logging.info(f"Displaying {len(linkedin_profile_list)} profiles to user.")
+        logger.info(f"Displaying {len(linkedin_profile_list)} profiles to user.")
         # Allow users to save profiles as CSV
         df = pd.DataFrame(linkedin_profile_list)
 
@@ -190,10 +193,10 @@ if st.button("Search"):
                     receiver_email=st.secrets["receiver_email"],
                     log_content=log_contents
                 )
-            logging.info("Logs sent after scraping.")
+            logger.info("Logs sent after scraping.")
             st.session_state['log_stream'].truncate(0)
             st.session_state['log_stream'].seek(0)
     else:
-            logging.warning("No logs captured to send via email.")  
+            logger.info("No logs captured to send via email.")  
 else:
     st.info("Get started by selecting up to three companies.")
