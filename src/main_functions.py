@@ -267,7 +267,7 @@ def create_supabase_client(supabase_url, supabase_key):
 
 def query_stealth_founder_table(supabase, past_company):
     try:
-        response = supabase.table("Unicorn-Stealth-Founder-Profiles").select("*").eq("search_company", past_company).execute()
+        response = supabase.table("Unicorn-Stealth-Founder-Profiles").select("*").eq("search_company", past_company).eq("is_founder", True).execute()
 
         # Check if the response contains data
         if response:
