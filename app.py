@@ -55,60 +55,140 @@ def convert_df_to_csv(df):
 supabase_client = create_supabase_client(supabase_url, supabase_key)
 
 def display_profile_card(profile):
-    with st.container(border=True):
-        # Displaying basic profile information
-        st.markdown(f"### {profile['full_name']}")
-        st.markdown(f"**{profile['job_title']}**")
-        st.markdown(f"📍 {profile['location']}")
-        st.markdown(f"👥 Followers: {profile['follower_count']} | 🔗 Connections: {profile['connection_count']}")
-        st.markdown(profile['headline'])
-        st.markdown(f"[View LinkedIn Profile]({profile['linkedin_url']})")
-
-        # Experience Section
-        st.markdown("#### Experience")
-        for exp in profile['experience'][:3]:  # Show only the top 3 experiences
-            st.markdown(f"- **{exp['title']}** at **{exp['company']}** from {exp['date_range']} ({exp['duration']})")
-        
-        if len(profile['experience']) > 3:
-            st.write(f"More experience available in the CSV download.")
-
-        # Education Section
-        st.markdown("#### Education")
-        for edu in profile['education']:
-            st.markdown(f"- **{edu['degree']}** in {edu['field_of_study']} | {edu['school']} ({edu['date_range']})")
-
-    # Add spacing between cards
-    st.markdown("---")
-
-# Custom CSS for further styling
-st.markdown("""
-<style>
-    .stContainer {
-        padding: 1rem;
-        margin-bottom: 1rem;
-        border: 1px solid #ddd;
-        border-radius: 10px;
-        box-shadow: 2px 2px 12px rgba(0,0,0,0.1);
-        background-color: #fff;
+    # Custom CSS for styling
+    st.markdown("""
+    <style>
+    .profile-container {
+        padding: 1.5rem;
+        margin-bottom: 2rem;
+        border: 1px solid #e0e0e0;
+        border-radius: 12px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        background-color: #ffffff;
     }
-    .stContainer > div > div > p {
-        margin-bottom: 0.5rem;
-    }
-    .stContainer h3 {
-        margin-bottom: 0.5rem;
-    }
-    .stContainer ul {
-        margin-bottom: 0.5rem;
-        padding-left: 1rem;
-    }
-    .stContainer .element-container {
-        margin-bottom: 0.5rem;
-    }
-    h3, h4 {
+    .profile-container h3 {
         color: #2c3e50;
+        margin: 0 0 0.5rem 0;
+        font-size: 1.6rem;
+        font-weight: 600;
     }
-</style>
-""", unsafe_allow_html=True)
+    .profile-container h4 {
+        color: #34495e;
+        margin: 1.5rem 0 0.5rem 0;
+        font-size: 1.3rem;
+        font-weight: 600;
+    }
+    .profile-container p {
+        margin: 0 0 0.8rem 0;
+        font-size: 0.95rem;
+        line-height: 1.5;
+        color: #555;
+    }
+    .profile-container ul {
+        margin: 0 0 1rem 0;
+        padding-left: 1.2rem;
+    }
+    .profile-container li {
+        margin-bottom: 0.6rem;
+        font-size: 0.9rem;
+        line-height: 1.4;
+        color: #555;
+    }
+    .label-container {
+        margin-bottom: 0.8rem;
+    }
+    .label {
+    display: inline-block;
+    padding: 0.3em 0.6em;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: #FFFFFF;
+    border-radius: 50px;
+    margin-right: 0.4rem;
+    margin-bottom: 0.4rem;
+}
+.label-role { background-color: #4A69BD; }
+.label-senior { background-color: #52BE80; }
+.label-repeat { background-color: #A569BD; }
+    .profile-container a {
+        color: #3498db;
+        text-decoration: none;
+        transition: color 0.2s ease;
+    }
+    .profile-container a:hover {
+        color: #2980b9;
+        text-decoration: underline;
+    }
+    .more-info {
+        font-style: italic;
+        color: #7f8c8d;
+        font-size: 0.85rem;
+    }
+    .profile-divider {
+    border-top: 1px solid #e0e0e0;
+    margin: 1rem 0;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+    # Build the HTML content
+    html_content = '<div class="profile-container">'
+    
+    # Full name
+    html_content += f"<h3>{profile['first_name']} {profile['last_name']}</h3>"
+    
+    # Labels container
+    labels_html = '<div class="label-container">'
+    
+    # Role at company searched
+    if 'role_at_company_searched' in profile and profile['role_at_company_searched']:
+        labels_html += f'<span class="label label-role">{profile["role_at_company_searched"]}</span>'
+    
+    # Key labels
+    if profile.get('is_senior_operator'):
+        labels_html += '<span class="label label-senior">Senior Operator</span>'
+    if profile.get('is_repeat_founder'):
+        labels_html += '<span class="label label-repeat">Repeat Founder</span>'
+    
+    labels_html += '</div>'
+    html_content += labels_html
+    
+    # Location
+    if profile.get('location'):
+        html_content += f'<p>📍 {profile["location"]}</p>'
+    
+    # LinkedIn profile link
+    html_content += f'<p><a href="{profile["linkedin_url"]}" target="_blank">View LinkedIn Profile</a></p>'
+    
+    # Experience
+    html_content += '<h4>Experience</h4><ul>'
+    for exp in profile['experience'][:3]:
+        html_content += f'<li><strong>{exp["title"]}</strong> at <strong>{exp["company"]}</strong><br><span style="font-size: 0.85rem; color: #7f8c8d;">{exp["date_range"]} ({exp["duration"]})</span></li>'
+    html_content += '</ul>'
+    
+    if len(profile['experience']) > 3:
+        html_content += '<p class="more-info">More experience available in the CSV download.</p>'
+    
+    # Education
+    if profile.get('education'):
+        html_content += '<h4>Education</h4><ul>'
+        for edu in profile['education'][:2]:
+            html_content += f'<li><strong>{edu["degree"]}</strong> in {edu["field_of_study"]} | {edu["school"]}<br><span style="font-size: 0.85rem; color: #7f8c8d;">{edu["date_range"]}</span></li>'
+        html_content += '</ul>'
+    
+    # Close the container div
+    html_content += '</div>'
+    
+    # Output the HTML content
+    st.markdown(html_content, unsafe_allow_html=True)
+
+    #Output a divider after content
+    st.markdown('<div class="profile-divider"></div>', unsafe_allow_html=True)
+    
+    # Add spacing between cards
+    st.markdown("<div style='margin-bottom: 1.5rem;'></div>", unsafe_allow_html=True)
+
+
 
 # Custom CSS for fixed sidebar
 st.markdown("""

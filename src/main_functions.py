@@ -189,7 +189,7 @@ def store_profiles_to_csv(profiles, filename=None):
         # Write headers
         writer.writerow([
             'Full Name', 'First Name', 'Last Name', 'Headline', 'LinkedIn URL',
-            'Job Title', 'Follower Count', 'Connection Count', 'City', 'Location', 'Experience', 'Education'
+            'Job Title', 'Follower Count', 'Connection Count', 'City', 'Location', 'Experience', 'Education', 'is_repeat_founder', 'is_senior_operator'
         ])
 
         # Write each profile
@@ -211,7 +211,9 @@ def store_profiles_to_csv(profiles, filename=None):
                 profile.get('city', ''),
                 profile.get('location', ''),
                 experience,
-                education
+                education,
+                profile.get('is_repeat_founder', ''),
+                profile.get('is_senior_operator', '')
             ])
 
     print(f"Profiles saved to {filename}")
